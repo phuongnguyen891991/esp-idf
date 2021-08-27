@@ -12,8 +12,7 @@
 TaskHandle_t adcHandle;
 TaskHandle_t ledHandle;
 
-void solar_energy_service()
-{
+void solar_energy_service() {
     BaseType_t xReturn;
 
     xReturn = xTaskCreate(adc_interface_service, "adc_handler_task", 1024*100, NULL, 5, &adcHandle);
@@ -23,7 +22,7 @@ void solar_energy_service()
         vTaskDelete(adcHandle);
     }
 
-    xReturn = xTaskCreate(blink_led, "blink led", 512, NULL, 5, &ledHandle);
+    xReturn = xTaskCreate(normal_led, "blink led", 512, NULL, 5, &ledHandle);
     if (pdPASS == xReturn) {
         printf("Already start led handler ! \n");
     } else {
