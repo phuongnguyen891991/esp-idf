@@ -59,7 +59,7 @@ static void print_char_val_type(esp_adc_cal_value_t val_type)
     }
 }
 
-void adc_interface_service(void)
+void adc_interface_service(void *arg)
 {
     //Check if Two Point or Vref are burned into eFuse
     check_efuse();
