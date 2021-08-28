@@ -7,4 +7,4 @@
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 
-void adc_interface_service(void *arg);
+void volt_measure_service(void *arg);
