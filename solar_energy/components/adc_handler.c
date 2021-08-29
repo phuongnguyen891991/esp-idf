@@ -19,6 +19,8 @@ static const adc_atten_t atten = ADC_ATTEN_DB_0;
 static const adc_unit_t unit = ADC_UNIT_1;
 
 QueueHandle_t xQueue;
+uint32_t g_volt = 0;
+uint32_t g_curr = 0;
 
 typedef enum{
     VOLT_SENDER,
@@ -105,7 +107,7 @@ void volt_measure_service(void *arg) {
             printf("Failed to send volt data to queue \n");
             continue;
         }
-        printf("Raw (volt sensor): %d\tVoltage: %dmV\n", adc_reading, voltage);
+        // printf("Raw (volt sensor): %d\tVoltage: %dmV\n", adc_reading, voltage);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
@@ -141,7 +143,7 @@ void current_measure_service(void *arg) {
             printf("Failed to current data to queue \n");
             continue;
         }
-        printf("Raw (current sensor): %d\tVoltage: %dmV\n", adc_reading, voltage);
+        // printf("Raw (current sensor): %d\tVoltage: %dmV\n", adc_reading, voltage);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
@@ -149,17 +151,21 @@ void current_measure_service(void *arg) {
 void xQueue_received(void *arg) {
     BaseType_t xStatus;
     Data_t xReceived;
+    const TickType_t xTicksToWait = pdMS_TO_TICKS( 100 );
 
     for (;;) {
-        xStatus = xQueueReceive(xQueue, &xReceived, 0 );
+        xStatus = xQueueReceive(xQueue, &xReceived, xTicksToWait);
         if (pdPASS == xStatus) {
             if (xReceived.Sender == VOLT_SENDER) {
+                g_volt = xReceived.ucValue;
                 printf("Queue volt value is: %d \n", xReceived.ucValue);
             } else if (xReceived.Sender == CURR_SENDER) {
                 printf("Queue curr value is: %d \n", xReceived.ucValue);
+                g_curr = xReceived.ucValue;
             } else {
                 printf("Not handler for now");
             }
+            printf("Power consum: %d \n", (g_volt*g_curr));
         }
     }
 }
