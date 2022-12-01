@@ -23,10 +23,10 @@ typedef struct led_checking {
 };
 
 typedef struct gpio_config {
-    gpio_num_t gpio;
-    uint8_t speed;
+    gpio_num_t  gpio;
+    uint8_t     speed;
     gpio_mode_t gpio_mode;
-    uint8_t state;
+    uint8_t     state;
 };
 
 static struct led_checking led_status;

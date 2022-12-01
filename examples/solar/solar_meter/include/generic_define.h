@@ -35,10 +35,16 @@ extern "C" {
 #define GPIO_MEA_CUR_CONSUM (23)
 
 #define BUF_SIZE_TASK 1024
+#define MAX_QUEUE_SIZE  10
+#define PANEL_TYPE  1
+#define CONSUME_TYPE 2
+#define INTERNAL_CHECK  100
 
 typedef struct power_measure {
     uint8_t vol;
     uint8_t current;
+    uint16_t power;
+    uint8_t type;
 };
 
 enum delay_mode {
@@ -58,7 +64,7 @@ enum led_indicate {
 };
 
 
-static QueueHandle_t power_manage_queue;
+static QueueHandle_t power_panel_queue;
 static QueueHandle_t power_consume_queue;
 
 static uint16_t g_power_panel_mea;
@@ -70,6 +76,14 @@ static TaskHandle_t xTaskLedPanel;
 static TaskHandle_t xTaskLedConsume;
 static TaskHandle_t xTaskPowerConsume;
 
+typedef struct power_in_queue {
+    uint32_t previous;
+    uint32_t now;
+    uint32_t kp_power; // the units in kilo power
+};
+
+static struct power_in_queue kp_panel;
+static struct power_in_queue kp_consume;
 
 #ifdef __cplusplus
 }
