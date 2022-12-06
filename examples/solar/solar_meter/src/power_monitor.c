@@ -8,7 +8,7 @@
 #include "freertos/queue.h"
 #include "power_monitor.h"
 #include "generic_define.h"
-#include "led_state_monitor.h"
+#include "gpio_state_monitor.h"
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 

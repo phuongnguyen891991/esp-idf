@@ -13,7 +13,7 @@
 #include "esp_log.h"
 #include "led_strip.h"
 #include "sdkconfig.h"
-#include "led_state_monitor.h"
+#include "gpio_state_monitor.h"
 #include "power_monitor.h"
 
 void app_main(void)

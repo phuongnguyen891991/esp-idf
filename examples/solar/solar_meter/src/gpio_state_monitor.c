@@ -4,8 +4,8 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-#include "led_state_monitor.h"
-#include "relay_monitor.h"
+#include "gpio_state_monitor.h"
+#include "delay_monitor.h"
 #include "generic_define.h"
 
 #define BLINK_GPIO 2
@@ -42,10 +42,10 @@ void kitchen_light(bool request)
 {
     struct gpio_config kitchen_light;
     kitchen_light.gpio = KITCHEN_LIGHT;
-    kitchen_light.mode = GPIO_MODE_OUTPUT;
+    kitchen_light.gpio_mode = GPIO_MODE_OUTPUT;
 
-    init_gpio(&kitchen_light);
-    gpio_set_level(request);
+    initialize_gpio(&kitchen_light);
+    gpio_set_level(kitchen_light.gpio, request);
 
     return;
 }
@@ -54,10 +54,10 @@ void exhausted_fan(bool request)
 {
     struct gpio_config exhausted_fan;
     exhausted_fan.gpio = EXHAUSTED_FAN;
-    exhausted_fan.gpio = GPIO_MODE_OUTPUT;
+    exhausted_fan.gpio_mode = GPIO_MODE_OUTPUT;
 
-    init_gpio(&exhausted_fan);
-    gpio_set_level(request);
+    initialize_gpio(&exhausted_fan);
+    gpio_set_level(exhausted_fan.gpio, request);
 
     return;
 }

@@ -8,8 +8,8 @@ extern "C" {
 #endif
 
 #include <stdio.h>
-#include "led_state_monitor.h"
-#include "relay_monitor.h"
+#include "gpio_state_monitor.h"
+#include "delay_monitor.h"
 
 BaseType_t power_consume_measure_main_task();
 BaseType_t power_panel_measure_main_task();
