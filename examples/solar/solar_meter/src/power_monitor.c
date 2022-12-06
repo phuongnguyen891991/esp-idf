@@ -12,11 +12,13 @@
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
 
-#define DEFAULT_VREF    1100        //Use adc2_vref_to_gpio() to obtain a better estimate
-#define NO_OF_SAMPLES   64          //Multisampling
+#define DEFAULT_VREF        1100        //Use adc2_vref_to_gpio() to obtain a better estimate
+#define NO_OF_SAMPLES       64          //Multisampling
 
-#define MAX_QUEUE   10
-static const char *TAG = "power";
+#define MAX_QUEUE           10
+#define ADC_EXAMPLE_ATTEN   ADC_ATTEN_DB_11
+
+static const char *TAG = "Power";
 
 uint32_t getMillis(void)
 {
@@ -27,22 +29,19 @@ uint32_t getMillis(void)
 
 uint8_t queue_power_init()
 {
-    // memset(&kp_panel, 0, sizeof(struct power_in_cache));
-    // memset(&kp_consume, 0, sizeof(struct power_in_cache));
-
     memset(&kp_panel_storage, 0, sizeof(struct power_storage));
     memset(&kp_consume_storage, 0, sizeof(struct power_storage));
 
     power_panel_queue = xQueueCreate(MAX_QUEUE_SIZE, sizeof(struct power_storage));
     if (power_panel_queue == 0)
     {
-        ESP_LOGI(TAG, "Failed to create queue !");
+        ESP_LOGI(TAG, "Failed to create queue for data panel!");
     }
 
     power_consume_queue = xQueueCreate(MAX_QUEUE_SIZE, sizeof(struct power_storage));
     if (power_consume_queue == 0)
     {
-        ESP_LOGI(TAG, "Failed to create queue !");
+        ESP_LOGI(TAG, "Failed to create queue for data consume!");
     }
 
     return RET_OK;
@@ -63,40 +62,25 @@ uint8_t push_data_to_queue(struct power_storage *power)
     return RET_OK;
 }
 
+
 uint8_t read_power(uint32_t *measure, adc_channel_t channel)
 {
-    static const adc_atten_t atten = ADC_ATTEN_DB_0;
-    static const adc_unit_t unit = ADC_UNIT_1;
-    // static const adc_channel_t channel = ADC1_CHANNEL_5;
+    uint32_t voltage = 0;
+    static esp_adc_cal_characteristics_t adc_chars;
 
-    esp_adc_cal_characteristics_t *adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
-    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(unit, atten, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars);
-    //Check type of calibration value used to characterize ADC
-    //Continuously sample ADC1
-    // while (1)
-    {
-        uint32_t adc_reading = 0;
-        //Multi sampling
-        for (int i = 0; i < NO_OF_SAMPLES; i++)
-        {
-            adc_reading += adc1_get_raw((adc1_channel_t)channel);
-        }
-        adc_reading /= NO_OF_SAMPLES;
-        //Convert adc_reading to voltage in mV
-        uint32_t voltage = esp_adc_cal_raw_to_voltage(adc_reading, adc_chars);
-        ESP_LOGI(TAG, "Channel: %d Raw: %d\tVoltage: %.2dV\n", channel, (int)adc_reading, (int)voltage/1000);
-        *measure = voltage;
+    ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_12));
+    ESP_ERROR_CHECK(adc1_config_channel_atten(channel, ADC_EXAMPLE_ATTEN));
 
-        // // Routing ADC reference voltage to GPIO, so it can be manually measured (for Default Vref):
-        // esp_err_t status = adc_vref_to_gpio(unit, gpio_num);
-        // if (status == ESP_OK) {
-        //     ESP_LOGI(TAG, "v_ref routed to GPIO\n");
-        // } else {
-        //     ESP_LOGI(TAG, "failed to route v_ref\n");
-        // }
+    uint32_t adc_reading = 0;
 
-        delay_second(MODE_NORMAL_DELAY);
-    }
+    for (int i = 0; i < NO_OF_SAMPLES; i++)
+        adc_reading += adc1_get_raw((adc1_channel_t)channel);
+
+    adc_reading /= NO_OF_SAMPLES;
+    //Convert adc_reading to voltage in mV
+    voltage = esp_adc_cal_raw_to_voltage(adc_reading, &adc_chars);
+    ESP_LOGI(TAG, "Channel: %d Raw: %d\tVoltage: %d mV", channel, (int)adc_reading, (int)voltage);
+    *measure = voltage;
 
     return RET_OK;
 }
@@ -159,68 +143,57 @@ uint8_t power_calculation(struct power_measure *measure)
 
 void power_panel_measure_main_loop()
 {
-    while (1)
+    while(1)
     {
-        // read and calculate data
         ESP_LOGI(TAG, "Power panel measurement !");
-        // push data into queue
-        // display LCD
         struct power_measure measure;
         uint8_t status = 0;
-        status = read_power(&measure.vol, GPIO_MEA_VOL_PANEL);
+
+        status = read_power(&measure.vol, ADC1_CHANNEL_0);
         if (status != RET_OK)
             measure.vol = 0;
-            // return;
 
-        status = read_power(&measure.current, GPIO_MEA_CUR_PANEL);
+        status = read_power(&measure.current, ADC1_CHANNEL_3);
         if (status != RET_OK)
             measure.current = 0;
-            // return;
 
         measure.type = PANEL_TYPE;
         status = power_calculation(&measure);
         if (status != RET_OK)
-            return;
+            delay_msecond(MODE_NORMAL_DELAY);
 
-        delay_second(1);
+        delay_msecond(MODE_NORMAL_DELAY);
     }
-    return;
 }
 
 void power_consume_measure_main_loop()
 {
-    while (1)
+    while(1)
     {
-        // read and calculate data
-        ESP_LOGI(TAG, "Power panel measurement !");
-        // push data into queue
-        // display LCD
+        ESP_LOGI(TAG, "Power consume measurement !");
         struct power_measure measure;
         uint8_t status = 0;
-        status = read_power(&measure.vol, GPIO_MEA_VOL_CONSUM);
+        status = read_power(&measure.vol, ADC1_CHANNEL_6);
         if (status != RET_OK)
             measure.vol = 0;
-            // return;
 
-        status = read_power(&measure.current, GPIO_MEA_CUR_CONSUM);
+        status = read_power(&measure.current, ADC1_CHANNEL_7);
         if (status != RET_OK)
             measure.current = 0;
-            // return;
 
         measure.type = CONSUME_TYPE;
         status = power_calculation(&measure);
         if (status != RET_OK)
-            return;
+            delay_msecond(MODE_NORMAL_DELAY);
 
-        delay_second(1);
+        delay_msecond(MODE_NORMAL_DELAY);
     }
-    return;
 }
 
 void init_gpio_power_panel()
 {
     led_power_panel.gpio = GPIO_LED_PANEL;
-    led_power_panel.speed = MODE_NORMAL_DELAY;
+    led_power_panel.speed = (MODE_NORMAL_DELAY*2);
     led_power_panel.gpio_mode = GPIO_MODE_OUTPUT;
     led_power_panel.state = led_status.led_power_panel;
 }
@@ -228,7 +201,7 @@ void init_gpio_power_panel()
 void init_gpio_power_consume()
 {
     led_power_consume.gpio = GPIO_LED_CONSUME;
-    led_power_consume.speed = MODE_NORMAL_DELAY;
+    led_power_consume.speed = (MODE_NORMAL_DELAY*2);
     led_power_consume.gpio_mode = GPIO_MODE_OUTPUT;
     led_power_consume.state = led_status.led_power_consume;
 }
@@ -241,13 +214,13 @@ BaseType_t power_measure_init_task()
     if(xReturn == pdPASS)
     {
         /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "The task of power panel was created ");
+        ESP_LOGI(TAG, "The task of power panel measure init ");
         // vTaskDelete(xTaskLedSTate);
         // Because of successful task, we need to create task blink led status
     }
 
     init_gpio_power_panel();
-    xReturn = xTaskCreate(led_state_main_loop, "", 2 * BUF_SIZE_TASK, &led_power_panel, 0, &xTaskLedPanel);
+    xReturn = xTaskCreate(led_state_main_loop, "", 2 * BUF_SIZE_TASK, &led_power_panel, 1, &xTaskLedPanel);
     if(xReturn == pdPASS)
     {
         /* The task was created.  Use the task's handle to delete the task. */
@@ -261,19 +234,19 @@ BaseType_t power_consume_init_task()
 {
     BaseType_t xReturn;
 
-    xReturn = xTaskCreate(power_consume_measure_main_loop, "measure power from panel", 2 * BUF_SIZE_TASK, NULL, 1, &xTaskPanelMea);
+    xReturn = xTaskCreate(power_consume_measure_main_loop, "measure power from comsume", 2 * BUF_SIZE_TASK, NULL, 1, &xTaskPanelMea);
     if(xReturn == pdPASS)
     {
         /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "The task of power panel was created ");
+        ESP_LOGI(TAG, "The task of power consume measure init ");
     }
 
     init_gpio_power_consume();
-    xReturn = xTaskCreate(led_state_main_loop, "", 2 * BUF_SIZE_TASK, &led_power_consume, 0, &xTaskLedConsume);
+    xReturn = xTaskCreate(led_state_main_loop, "", 2 * BUF_SIZE_TASK, &led_power_consume, 1, &xTaskLedConsume);
     if(xReturn == pdPASS)
     {
         /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "turn on led to tracking power from panel ");
+        ESP_LOGI(TAG, "turn on led to tracking power consume ");
     }
     return xReturn;
 }
@@ -298,7 +271,7 @@ BaseType_t power_panel_measure_main_task()
     xReturn = power_measure_init_task();
     if(xReturn == pdPASS)
     {
-        ESP_LOGI(TAG, "The task of power panel was created ");
+        ESP_LOGI(TAG, "The main task of power panel was created ");
     }
     return xReturn;
 }
@@ -311,7 +284,7 @@ BaseType_t power_consume_measure_main_task()
     if(xReturn == pdPASS)
     {
         /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "The task of power consume was created ");
+        ESP_LOGI(TAG, "The main task of power consume was created ");
     }
     return xReturn;
 }

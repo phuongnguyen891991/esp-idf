@@ -9,8 +9,9 @@
 #include "generic_define.h"
 
 #define BLINK_GPIO 2
-static const char *TAG = "Led";
+static const char *TAG = "LED";
 
+#define DELAY_IN_SEC    2
 #define QUICK_DELAY     100
 #define SORT_DELAY      500
 #define NORMAL_DELAY    1000
@@ -32,30 +33,21 @@ void initialize_gpio(struct gpio_config *led)
     if (led == NULL)
         return;
 
-    ESP_LOGI(TAG, "Example configured to blink GPIO LED!");
     gpio_reset_pin(led->gpio);
     /* Set the GPIO as a push/pull output */
     gpio_set_direction(led->gpio, led->gpio_mode);
 }
 
-void kitchen_light(bool request)
+void kitchen_light_func(bool request)
 {
-    struct gpio_config kitchen_light;
-    kitchen_light.gpio = KITCHEN_LIGHT;
-    kitchen_light.gpio_mode = GPIO_MODE_OUTPUT;
-
     initialize_gpio(&kitchen_light);
     gpio_set_level(kitchen_light.gpio, request);
 
     return;
 }
 
-void exhausted_fan(bool request)
+void exhausted_fan_func(bool request)
 {
-    struct gpio_config exhausted_fan;
-    exhausted_fan.gpio = EXHAUSTED_FAN;
-    exhausted_fan.gpio_mode = GPIO_MODE_OUTPUT;
-
     initialize_gpio(&exhausted_fan);
     gpio_set_level(exhausted_fan.gpio, request);
 
@@ -73,7 +65,7 @@ void running_led(struct gpio_config *led)
         return;
 
     blink_led(led);
-    ESP_LOGI(TAG, "GPIO LED (%d) status : %d", led->gpio, led->state);
+    ESP_LOGI(TAG, "GPIO LED (%d) status : %s", led->gpio, led->state == 255 ? "ON" : "OFF");
     led->state = ~(led->state);
     delay_msecond(led->speed);
     return;
@@ -98,11 +90,11 @@ BaseType_t led_state_main_task()
     BaseType_t xReturn;
 
     led_running.gpio = BLINK_GPIO;
-    led_running.speed = NORMAL_DELAY;
+    led_running.speed = (NORMAL_DELAY*2);
     led_running.gpio_mode = GPIO_MODE_OUTPUT;
     led_running.state = led_status.led_running;
 
-    xReturn = xTaskCreate(led_state_main_loop, "task blink led", 2 * BUF_SIZE_TASK, &led_running, 1, &TaskLedSTate);
+    xReturn = xTaskCreate(led_state_main_loop, "Task blink LED", 2 * BUF_SIZE_TASK, &led_running, 1, &TaskLedSTate);
     if(xReturn == pdPASS)
     {
         /* The task was created.  Use the task's handle to delete the task. */

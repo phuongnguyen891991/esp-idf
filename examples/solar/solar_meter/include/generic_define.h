@@ -25,17 +25,17 @@ extern "C" {
 #define FALSE_STATE 0
 
 // define GPIO number for using in this project
-#define GPIO_LED_PANEL      (15)
-#define GPIO_LED_CONSUME    (17)
-#define GPIO_LED_WIFI       (19)
+#define GPIO_LED_PANEL      GPIO_NUM_17
+#define GPIO_LED_CONSUME    GPIO_NUM_18
+#define GPIO_LED_WIFI       GPIO_NUM_19
 
-#define KITCHEN_LIGHT   GPIO_NUM_12
-#define EXHAUSTED_FAN   GPIO_NUM_13
+#define KITCHEN_LIGHT   GPIO_NUM_25
+#define EXHAUSTED_FAN   GPIO_NUM_26
 
-#define GPIO_MEA_VOL_PANEL  (32)
-#define GPIO_MEA_CUR_PANEL  (33)
-#define GPIO_MEA_VOL_CONSUM (34)
-#define GPIO_MEA_CUR_CONSUM (35)
+#define GPIO_MEA_VOL_PANEL  ADC1_CHANNEL_0 // GPIO_NUM_36
+#define GPIO_MEA_CUR_PANEL  ADC1_CHANNEL_3 // GPIO_NUM_39
+#define GPIO_MEA_VOL_CONSUM ADC1_CHANNEL_6 // GPIO_NUM_34
+#define GPIO_MEA_CUR_CONSUM ADC1_CHANNEL_7 // GPIO_NUM_35
 
 #define BUF_SIZE_TASK 1024
 #define MAX_QUEUE_SIZE  10
@@ -73,7 +73,7 @@ enum led_indicate {
 
 typedef struct gpio_config {
     gpio_num_t  gpio;
-    uint8_t     speed;
+    uint32_t    speed;
     gpio_mode_t gpio_mode;
     uint8_t     state;
 };
@@ -116,6 +116,20 @@ static struct power_in_cache kp_consume;
 
 static struct power_storage kp_panel_storage;
 static struct power_storage kp_consume_storage;
+
+static struct gpio_config kitchen_light = {
+    .gpio = KITCHEN_LIGHT,
+    .speed = 0,
+    .gpio_mode = GPIO_MODE_OUTPUT,
+    .state = FALSE_STATE,
+};
+
+static struct gpio_config exhausted_fan = {
+    .gpio = EXHAUSTED_FAN,
+    .speed = 0,
+    .gpio_mode = GPIO_MODE_OUTPUT,
+    .state = FALSE_STATE,
+};
 
 #ifdef __cplusplus
 }
