@@ -27,7 +27,7 @@ static void blink_led(struct gpio_config *led)
 * gpio_num  : the gpio number on the board, ex: BLINK_GPIO
 * mode      : input or output mode, ex: GPIO_MODE_OUTPUT
 */
-void configure_led(struct gpio_config *led)
+void initialize_gpio(struct gpio_config *led)
 {
     if (led == NULL)
         return;
@@ -36,6 +36,30 @@ void configure_led(struct gpio_config *led)
     gpio_reset_pin(led->gpio);
     /* Set the GPIO as a push/pull output */
     gpio_set_direction(led->gpio, led->gpio_mode);
+}
+
+void kitchen_light(bool request)
+{
+    struct gpio_config kitchen_light;
+    kitchen_light.gpio = KITCHEN_LIGHT;
+    kitchen_light.mode = GPIO_MODE_OUTPUT;
+
+    init_gpio(&kitchen_light);
+    gpio_set_level(request);
+
+    return;
+}
+
+void exhausted_fan(bool request)
+{
+    struct gpio_config exhausted_fan;
+    exhausted_fan.gpio = EXHAUSTED_FAN;
+    exhausted_fan.gpio = GPIO_MODE_OUTPUT;
+
+    init_gpio(&exhausted_fan);
+    gpio_set_level(request);
+
+    return;
 }
 
 /*
@@ -61,7 +85,7 @@ void led_state_main_loop(void *para)
     if (para == NULL)
         return;
 
-    configure_led(led);
+    initialize_gpio(led);
     while(1)
     {
         running_led(led);

@@ -29,6 +29,9 @@ extern "C" {
 #define GPIO_LED_CONSUME    (17)
 #define GPIO_LED_WIFI       (19)
 
+#define KITCHEN_LIGHT   GPIO_NUM_12
+#define EXHAUSTED_FAN   GPIO_NUM_13
+
 #define GPIO_MEA_VOL_PANEL  (32)
 #define GPIO_MEA_CUR_PANEL  (33)
 #define GPIO_MEA_VOL_CONSUM (34)
@@ -68,6 +71,12 @@ enum led_indicate {
     LED_UNKNOWN_STATE       = 0
 };
 
+typedef struct gpio_config {
+    gpio_num_t  gpio;
+    uint8_t     speed;
+    gpio_mode_t gpio_mode;
+    uint8_t     state;
+};
 
 static QueueHandle_t power_panel_queue;
 static QueueHandle_t power_consume_queue;
