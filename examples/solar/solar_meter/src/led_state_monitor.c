@@ -78,7 +78,7 @@ BaseType_t led_state_main_task()
     led_running.gpio_mode = GPIO_MODE_OUTPUT;
     led_running.state = led_status.led_running;
 
-    xReturn = xTaskCreate(led_state_main_loop, "task blink led", 2 * BUF_SIZE_TASK, &led_running, 1, &xTaskLedSTate);
+    xReturn = xTaskCreate(led_state_main_loop, "task blink led", 2 * BUF_SIZE_TASK, &led_running, 1, &TaskLedSTate);
     if(xReturn == pdPASS)
     {
         /* The task was created.  Use the task's handle to delete the task. */

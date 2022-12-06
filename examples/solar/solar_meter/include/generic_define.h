@@ -29,16 +29,21 @@ extern "C" {
 #define GPIO_LED_CONSUME    (17)
 #define GPIO_LED_WIFI       (19)
 
-#define GPIO_MEA_VOL_PANEL  (20)
-#define GPIO_MEA_CUR_PANEL  (21)
-#define GPIO_MEA_VOL_CONSUM (22)
-#define GPIO_MEA_CUR_CONSUM (23)
+#define GPIO_MEA_VOL_PANEL  (32)
+#define GPIO_MEA_CUR_PANEL  (33)
+#define GPIO_MEA_VOL_CONSUM (34)
+#define GPIO_MEA_CUR_CONSUM (35)
 
 #define BUF_SIZE_TASK 1024
 #define MAX_QUEUE_SIZE  10
 #define PANEL_TYPE  1
 #define CONSUME_TYPE 2
 #define INTERNAL_CHECK  100
+
+typedef struct power_storage {
+    uint32_t power;
+    uint8_t type;
+};
 
 typedef struct power_measure {
     uint8_t vol;
@@ -70,20 +75,38 @@ static QueueHandle_t power_consume_queue;
 static uint16_t g_power_panel_mea;
 static uint16_t g_power_consume_mea;
 
-static TaskHandle_t xTaskLedSTate;
+
 static TaskHandle_t xTaskPanelMea;
 static TaskHandle_t xTaskLedPanel;
 static TaskHandle_t xTaskLedConsume;
-static TaskHandle_t xTaskPowerConsume;
 
-typedef struct power_in_queue {
+static TaskHandle_t xTaskLcdDisplayPanel;
+static TaskHandle_t xTaskLcdDisplayConsume;
+
+// typedef struct TaskHandleLed {
+    static TaskHandle_t TaskLedSTate;
+    static TaskHandle_t TaskLedPanel;
+    static TaskHandle_t TaskLedConsume;
+// };
+
+// typedef struct TaskHandleSensor {
+    static TaskHandle_t xTaskMeaVolPanel;
+    static TaskHandle_t xTaskMeaCurPanel;
+    static TaskHandle_t xTaskMeaVolConsume;
+    static TaskHandle_t xTaskMeaCurConsume;
+// };
+
+typedef struct power_in_cache {
     uint32_t previous;
     uint32_t now;
     uint32_t kp_power; // the units in kilo power
 };
 
-static struct power_in_queue kp_panel;
-static struct power_in_queue kp_consume;
+static struct power_in_cache kp_panel;
+static struct power_in_cache kp_consume;
+
+static struct power_storage kp_panel_storage;
+static struct power_storage kp_consume_storage;
 
 #ifdef __cplusplus
 }

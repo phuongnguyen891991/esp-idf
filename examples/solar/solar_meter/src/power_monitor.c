@@ -9,6 +9,11 @@
 #include "power_monitor.h"
 #include "generic_define.h"
 #include "led_state_monitor.h"
+#include "driver/adc.h"
+#include "esp_adc_cal.h"
+
+#define DEFAULT_VREF    1100        //Use adc2_vref_to_gpio() to obtain a better estimate
+#define NO_OF_SAMPLES   64          //Multisampling
 
 #define MAX_QUEUE   10
 static const char *TAG = "power";
@@ -22,16 +27,19 @@ uint32_t getMillis(void)
 
 uint8_t queue_power_init()
 {
-    memset(&kp_panel, 0, sizeof(struct power_in_queue));
-    memset(&kp_consume, 0, sizeof(struct power_in_queue));
+    // memset(&kp_panel, 0, sizeof(struct power_in_cache));
+    // memset(&kp_consume, 0, sizeof(struct power_in_cache));
 
-    power_panel_queue = xQueueCreate(MAX_QUEUE_SIZE, sizeof(struct power_measure));
+    memset(&kp_panel_storage, 0, sizeof(struct power_storage));
+    memset(&kp_consume_storage, 0, sizeof(struct power_storage));
+
+    power_panel_queue = xQueueCreate(MAX_QUEUE_SIZE, sizeof(struct power_storage));
     if (power_panel_queue == 0)
     {
         ESP_LOGI(TAG, "Failed to create queue !");
     }
 
-    power_consume_queue = xQueueCreate(MAX_QUEUE_SIZE, sizeof(struct power_measure));
+    power_consume_queue = xQueueCreate(MAX_QUEUE_SIZE, sizeof(struct power_storage));
     if (power_consume_queue == 0)
     {
         ESP_LOGI(TAG, "Failed to create queue !");
@@ -40,14 +48,14 @@ uint8_t queue_power_init()
     return RET_OK;
 }
 
-uint8_t push_data_to_queue(uint32_t *power, uint8_t type)
+uint8_t push_data_to_queue(struct power_storage *power)
 {
     if (power == NULL)
         return RET_ERR;
 
-    if (PANEL_TYPE == type)
+    if (PANEL_TYPE == power->type)
         xQueueSend(power_panel_queue, (void*)power, (TickType_t)0);
-    else if(PANEL_TYPE == type)
+    else if(PANEL_TYPE == power->type)
         xQueueSend(power_consume_queue, (void*)power, (TickType_t)0);
     else
         return RET_ERR;
@@ -55,7 +63,45 @@ uint8_t push_data_to_queue(uint32_t *power, uint8_t type)
     return RET_OK;
 }
 
-uint8_t calculate_power(struct power_measure *measure, struct power_in_queue *power)
+uint8_t read_power(uint32_t *measure, adc_channel_t channel)
+{
+    static const adc_atten_t atten = ADC_ATTEN_DB_0;
+    static const adc_unit_t unit = ADC_UNIT_1;
+    // static const adc_channel_t channel = ADC1_CHANNEL_5;
+
+    esp_adc_cal_characteristics_t *adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
+    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(unit, atten, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars);
+    //Check type of calibration value used to characterize ADC
+    //Continuously sample ADC1
+    // while (1)
+    {
+        uint32_t adc_reading = 0;
+        //Multi sampling
+        for (int i = 0; i < NO_OF_SAMPLES; i++)
+        {
+            adc_reading += adc1_get_raw((adc1_channel_t)channel);
+        }
+        adc_reading /= NO_OF_SAMPLES;
+        //Convert adc_reading to voltage in mV
+        uint32_t voltage = esp_adc_cal_raw_to_voltage(adc_reading, adc_chars);
+        ESP_LOGI(TAG, "Channel: %d Raw: %d\tVoltage: %.2dV\n", channel, (int)adc_reading, (int)voltage/1000);
+        *measure = voltage;
+
+        // // Routing ADC reference voltage to GPIO, so it can be manually measured (for Default Vref):
+        // esp_err_t status = adc_vref_to_gpio(unit, gpio_num);
+        // if (status == ESP_OK) {
+        //     ESP_LOGI(TAG, "v_ref routed to GPIO\n");
+        // } else {
+        //     ESP_LOGI(TAG, "failed to route v_ref\n");
+        // }
+
+        delay_second(MODE_NORMAL_DELAY);
+    }
+
+    return RET_OK;
+}
+
+uint8_t power_analyze(struct power_measure *measure, struct power_in_cache *power)
 {
     uint32_t capacity = 0;
 
@@ -75,34 +121,38 @@ uint8_t calculate_power(struct power_measure *measure, struct power_in_queue *po
     return RET_OK;
 }
 
-uint8_t power_panel_calculate(struct power_measure *measure)
+uint8_t power_calculation(struct power_measure *measure)
 {
     uint8_t status;
 
     if (measure == NULL)
         return RET_ERR;
 
-    status = calculate_power(measure, &kp_panel);
-    if (RET_OK != status)
+    if (PANEL_TYPE == measure->type)
+    {
+        status = power_analyze(measure, &kp_panel);
+        if (RET_OK != status)
+            return RET_ERR;
+
+        kp_panel_storage.power = kp_panel.kp_power;
+        kp_panel_storage.type = PANEL_TYPE;
+        push_data_to_queue(&kp_panel_storage);
+    }
+    else if (CONSUME_TYPE == measure->type)
+    {
+        status = power_analyze(measure, &kp_consume);
+        if (RET_OK != status)
+            return RET_ERR;
+
+        kp_consume_storage.power = kp_consume.kp_power;
+        kp_consume_storage.type = CONSUME_TYPE;
+        push_data_to_queue(&kp_consume_storage);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Not known type to push data to queue");
         return RET_ERR;
-
-    push_data_to_queue(kp_panel.kp_power, PANEL_TYPE);
-
-    // store the value into queue
-    return RET_OK;
-}
-
-uint8_t power_consume_calculate(struct power_measure *measure)
-{
-    uint8_t status;
-    if (measure == NULL)
-        return RET_ERR;
-
-    status = calculate_power(measure, &kp_consume);
-    if (RET_OK != status)
-        return RET_ERR;
-
-    push_data_to_queue(kp_consume.kp_power, CONSUME_TYPE);
+    }
     // store the value into queue
     return RET_OK;
 }
@@ -115,6 +165,23 @@ void power_panel_measure_main_loop()
         ESP_LOGI(TAG, "Power panel measurement !");
         // push data into queue
         // display LCD
+        struct power_measure measure;
+        uint8_t status = 0;
+        status = read_power(&measure.vol, GPIO_MEA_VOL_PANEL);
+        if (status != RET_OK)
+            measure.vol = 0;
+            // return;
+
+        status = read_power(&measure.current, GPIO_MEA_CUR_PANEL);
+        if (status != RET_OK)
+            measure.current = 0;
+            // return;
+
+        measure.type = PANEL_TYPE;
+        status = power_calculation(&measure);
+        if (status != RET_OK)
+            return;
+
         delay_second(1);
     }
     return;
@@ -122,11 +189,29 @@ void power_panel_measure_main_loop()
 
 void power_consume_measure_main_loop()
 {
-    // should init queue
     while (1)
     {
-        // running_led(gpio, speed);
-        ESP_LOGI(TAG, "Power consume measurement !");
+        // read and calculate data
+        ESP_LOGI(TAG, "Power panel measurement !");
+        // push data into queue
+        // display LCD
+        struct power_measure measure;
+        uint8_t status = 0;
+        status = read_power(&measure.vol, GPIO_MEA_VOL_CONSUM);
+        if (status != RET_OK)
+            measure.vol = 0;
+            // return;
+
+        status = read_power(&measure.current, GPIO_MEA_CUR_CONSUM);
+        if (status != RET_OK)
+            measure.current = 0;
+            // return;
+
+        measure.type = CONSUME_TYPE;
+        status = power_calculation(&measure);
+        if (status != RET_OK)
+            return;
+
         delay_second(1);
     }
     return;
