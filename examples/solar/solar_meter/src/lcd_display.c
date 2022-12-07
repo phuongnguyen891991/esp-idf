@@ -13,41 +13,74 @@
 //function to received data from queue, then show in LCD
 static const char *TAG = "LCD Display";
 
+TaskHandle_t xTaskLcdDisplayPanel;
+TaskHandle_t xTaskLcdDisplayConsume;
+
+
+#define STICK_TO_WAIT  portMAX_DELAY
+
 void get_power_panel_from_queue()
 {
+    // struct power_storage data[MAX_QUEUE_SIZE] = {0};
     struct power_storage data;
+    BaseType_t xStatus;
 
-    memset(&data, 0, sizeof(struct power_storage));
-    if (power_panel_queue != 0)
+    while (1)
     {
-        if (xQueueReceive(power_panel_queue, &(data), (TickType_t)10))
+        if (power_panel_queue != 0)
         {
-            ESP_LOGI(TAG, "power of queue chanel: %.2d, %.2d ", (int)data.power, (int)data.type);
+            xStatus = xQueueReceive(power_panel_queue, (void*)&data, (TickType_t)STICK_TO_WAIT);
+            if (xStatus == pdPASS)
+            {
+                ESP_LOGI(TAG, "power of queue chanel: %.2d, %.2d ", (int)data.power, (int)data.type);
+            }
+            else
+                ESP_LOGI(TAG, "power of queue chanel empty ");
         }
+        delay_msecond(MODE_NORMAL_DELAY);
     }
-
     return;
 }
 
 void get_power_consume_from_queue()
 {
+    // struct power_storage data[MAX_QUEUE_SIZE] = {0};
     struct power_storage data;
+    BaseType_t xStatus;
 
-    memset(&data, 0, sizeof(struct power_storage));
-    if (power_consume_queue != 0)
+    while(1)
     {
-        if (xQueueReceive(power_consume_queue, &(data), (TickType_t)10))
+        if (power_consume_queue != 0)
         {
-            ESP_LOGI(TAG, "power of queue consume: %.2d, %.2d ", (int)data.power, (int)data.type);
+            xStatus = xQueueReceive(power_consume_queue, (void*)&data, (TickType_t)STICK_TO_WAIT);
+            if (xStatus == pdPASS)
+            {
+                ESP_LOGI(TAG, "power of queue consume: %.2d, %.2d ", (int)data.power, (int)data.type);
+                // for (int i = 0; i < MAX_QUEUE_SIZE; i++)
+                // {
+                //     ESP_LOGI(TAG, "power of queue consume: %.2d, %.2d ", (int)data[i].power, (int)data[i].type);
+                // }
+            }
+            else
+                ESP_LOGI(TAG, "power of queue consume empty ");
         }
+        delay_msecond(MODE_NORMAL_DELAY);
     }
-
     return;
 }
 
 void lcd_display()
 {
     return;
+}
+
+void lcd_deinit()
+{
+    if (xTaskLcdDisplayPanel != NULL)
+        vTaskDelete(xTaskLcdDisplayPanel);
+
+    if (xTaskLcdDisplayConsume != NULL)
+        vTaskDelete(xTaskLcdDisplayConsume);
 }
 
 uint8_t lcd_display_init()

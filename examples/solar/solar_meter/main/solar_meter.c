@@ -15,6 +15,7 @@
 #include "sdkconfig.h"
 #include "gpio_state_monitor.h"
 #include "power_monitor.h"
+#include "lcd_display.h"
 
 void app_main(void)
 {
@@ -22,4 +23,5 @@ void app_main(void)
     led_state_main_task();
     power_consume_measure_main_task();
     power_panel_measure_main_task();
+    lcd_display_main_task();
 }

@@ -20,6 +20,23 @@
 
 static const char *TAG = "Power";
 
+QueueHandle_t power_panel_queue;
+QueueHandle_t power_consume_queue;
+
+TaskHandle_t xTaskPanelMea;
+TaskHandle_t xTaskLedPanel;
+TaskHandle_t xTaskConsumeMea;
+TaskHandle_t xTaskLedConsume;
+
+struct power_storage kp_panel_storage;
+struct power_storage kp_consume_storage;
+
+struct power_in_cache kp_panel;
+struct power_in_cache kp_consume;
+
+struct gpio_config led_power_panel;
+struct gpio_config led_power_consume;
+
 uint32_t getMillis(void)
 {
     struct timeval tv = { 0 };
@@ -49,19 +66,40 @@ uint8_t queue_power_init()
 
 uint8_t push_data_to_queue(struct power_storage *power)
 {
+    BaseType_t xStatus;
+
     if (power == NULL)
         return RET_ERR;
 
+    size_t available_space;
+
     if (PANEL_TYPE == power->type)
-        xQueueSend(power_panel_queue, (void*)power, (TickType_t)0);
-    else if(PANEL_TYPE == power->type)
-        xQueueSend(power_consume_queue, (void*)power, (TickType_t)0);
+    {
+        available_space = (size_t)uxQueueSpacesAvailable(power_panel_queue);
+        ESP_LOGI(TAG, "The current space in queue: %d ", available_space);
+
+        xStatus = xQueueSendToBack(power_panel_queue, (void*)power, (TickType_t)0);
+        if (xStatus == pdPASS)
+            ESP_LOGI(TAG, "success to send panel data to queue!");
+        else
+            ESP_LOGI(TAG, "Failed to send panel data to queue!");
+    }
+    else if(CONSUME_TYPE == power->type)
+    {
+        available_space = (size_t)uxQueueSpacesAvailable(power_consume_queue);
+        ESP_LOGI(TAG, "The current space in queue: %d ", available_space);
+
+        xStatus = xQueueSendToBack(power_consume_queue, (void*)power, (TickType_t)0);
+        if (xStatus == pdPASS)
+            ESP_LOGI(TAG, "Success to send consume data to queue!");
+        else
+            ESP_LOGI(TAG, "Failed to send consume data to queue!");
+    }
     else
         return RET_ERR;
 
     return RET_OK;
 }
-
 
 uint8_t read_power(uint32_t *measure, adc_channel_t channel)
 {
@@ -95,8 +133,8 @@ uint8_t power_analyze(struct power_measure *measure, struct power_in_cache *powe
     power->now = getMillis();
     if ((power->now - power->previous) >= INTERNAL_CHECK)
     {
-        if ((measure->vol == 0) || (measure->current == 0))
-            return RET_ERR;
+        // if ((measure->vol == 0) || (measure->current == 0))
+        //     return RET_ERR;
         // units of vol and Current: Vol and Ampe
         capacity = measure->vol * measure->current;
         power->kp_power = power->kp_power + (capacity/(1000*3600));
@@ -173,6 +211,7 @@ void power_consume_measure_main_loop()
         ESP_LOGI(TAG, "Power consume measurement !");
         struct power_measure measure;
         uint8_t status = 0;
+
         status = read_power(&measure.vol, ADC1_CHANNEL_6);
         if (status != RET_OK)
             measure.vol = 0;
@@ -234,7 +273,9 @@ BaseType_t power_consume_init_task()
 {
     BaseType_t xReturn;
 
-    xReturn = xTaskCreate(power_consume_measure_main_loop, "measure power from comsume", 2 * BUF_SIZE_TASK, NULL, 1, &xTaskPanelMea);
+    queue_power_init();
+
+    xReturn = xTaskCreate(power_consume_measure_main_loop, "measure power from comsume", 2 * BUF_SIZE_TASK, NULL, 1, &xTaskConsumeMea);
     if(xReturn == pdPASS)
     {
         /* The task was created.  Use the task's handle to delete the task. */
@@ -254,14 +295,16 @@ BaseType_t power_consume_init_task()
 void power_deinit_task()
 {
     if (xTaskLedConsume != NULL)
-    {
         vTaskDelete(xTaskLedConsume);
-    }
 
     if (xTaskLedPanel != NULL)
-    {
         vTaskDelete(xTaskLedPanel);
-    }
+
+    if (xTaskPanelMea != NULL)
+        vTaskDelete(xTaskPanelMea);
+
+    if (xTaskConsumeMea != NULL)
+        vTaskDelete(xTaskConsumeMea);
 }
 
 BaseType_t power_panel_measure_main_task()

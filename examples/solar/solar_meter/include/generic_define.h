@@ -49,9 +49,9 @@ typedef struct power_storage {
 };
 
 typedef struct power_measure {
-    uint8_t vol;
-    uint8_t current;
-    uint16_t power;
+    uint32_t vol;
+    uint32_t current;
+    uint32_t power;
     uint8_t type;
 };
 
@@ -78,32 +78,22 @@ typedef struct gpio_config {
     uint8_t     state;
 };
 
-static QueueHandle_t power_panel_queue;
-static QueueHandle_t power_consume_queue;
+extern QueueHandle_t power_panel_queue;
+extern QueueHandle_t power_consume_queue;
 
-static uint16_t g_power_panel_mea;
-static uint16_t g_power_consume_mea;
+extern TaskHandle_t xTaskPanelMea;
+extern TaskHandle_t xTaskLedPanel;
+extern TaskHandle_t xTaskConsumeMea;
+extern TaskHandle_t xTaskLedConsume;
+extern TaskHandle_t xTaskLedSTate;
 
+extern TaskHandle_t xTaskLcdDisplayPanel;
+extern TaskHandle_t xTaskLcdDisplayConsume;
 
-static TaskHandle_t xTaskPanelMea;
-static TaskHandle_t xTaskLedPanel;
-static TaskHandle_t xTaskLedConsume;
-
-static TaskHandle_t xTaskLcdDisplayPanel;
-static TaskHandle_t xTaskLcdDisplayConsume;
-
-// typedef struct TaskHandleLed {
-    static TaskHandle_t TaskLedSTate;
-    static TaskHandle_t TaskLedPanel;
-    static TaskHandle_t TaskLedConsume;
-// };
-
-// typedef struct TaskHandleSensor {
-    static TaskHandle_t xTaskMeaVolPanel;
-    static TaskHandle_t xTaskMeaCurPanel;
-    static TaskHandle_t xTaskMeaVolConsume;
-    static TaskHandle_t xTaskMeaCurConsume;
-// };
+// static TaskHandle_t xTaskMeaVolPanel;
+// static TaskHandle_t xTaskMeaCurPanel;
+// static TaskHandle_t xTaskMeaVolConsume;
+// static TaskHandle_t xTaskMeaCurConsume;
 
 typedef struct power_in_cache {
     uint32_t previous;
@@ -111,25 +101,8 @@ typedef struct power_in_cache {
     uint32_t kp_power; // the units in kilo power
 };
 
-static struct power_in_cache kp_panel;
-static struct power_in_cache kp_consume;
-
-static struct power_storage kp_panel_storage;
-static struct power_storage kp_consume_storage;
-
-static struct gpio_config kitchen_light = {
-    .gpio = KITCHEN_LIGHT,
-    .speed = 0,
-    .gpio_mode = GPIO_MODE_OUTPUT,
-    .state = FALSE_STATE,
-};
-
-static struct gpio_config exhausted_fan = {
-    .gpio = EXHAUSTED_FAN,
-    .speed = 0,
-    .gpio_mode = GPIO_MODE_OUTPUT,
-    .state = FALSE_STATE,
-};
+extern struct gpio_config kitchen_light;
+extern struct gpio_config exhausted_fan;
 
 #ifdef __cplusplus
 }
