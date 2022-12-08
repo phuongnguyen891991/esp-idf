@@ -4,7 +4,8 @@ list(APPEND srcs
         "../src/gpio_state_monitor.c"
         "../src/power_monitor.c"
         "../src/lcd_display.c"
-        "../src/lcd2004_i2c.c")
+        "../src/lcd2004_i2c.c"
+        "../src/wifi_config.c")
 
 idf_component_register(SRCS ${srcs}
                        INCLUDE_DIRS "."

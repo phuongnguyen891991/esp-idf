@@ -16,6 +16,7 @@
 #include "gpio_state_monitor.h"
 #include "power_monitor.h"
 #include "lcd_display.h"
+#include "wifi_config.h"
 
 void app_main(void)
 {
@@ -24,4 +25,5 @@ void app_main(void)
     power_consume_measure_main_task();
     power_panel_measure_main_task();
     lcd_display_main_task();
+    wifi_config();
 }
