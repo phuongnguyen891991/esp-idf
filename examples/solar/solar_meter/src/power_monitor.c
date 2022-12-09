@@ -24,9 +24,7 @@ QueueHandle_t power_panel_queue;
 QueueHandle_t power_consume_queue;
 
 TaskHandle_t xTaskPanelMea;
-TaskHandle_t xTaskLedPanel;
 TaskHandle_t xTaskConsumeMea;
-TaskHandle_t xTaskLedConsume;
 
 struct power_storage kp_panel_storage;
 struct power_storage kp_consume_storage;
@@ -34,8 +32,8 @@ struct power_storage kp_consume_storage;
 struct power_in_cache kp_panel;
 struct power_in_cache kp_consume;
 
-struct gpio_config led_power_panel;
-struct gpio_config led_power_consume;
+bool panel_checking;
+bool consume_checking;
 
 uint32_t getMillis(void)
 {
@@ -133,8 +131,9 @@ uint8_t power_analyze(struct power_measure *measure, struct power_in_cache *powe
     power->now = getMillis();
     if ((power->now - power->previous) >= INTERNAL_CHECK)
     {
-        // if ((measure->vol == 0) || (measure->current == 0))
-        //     return RET_ERR;
+        if ((measure->vol == 0) || (measure->current == 0))
+            return RET_ERR;
+
         // units of vol and Current: Vol and Ampe
         capacity = measure->vol * measure->current;
         power->kp_power = power->kp_power + (capacity/(1000*3600));
@@ -154,21 +153,29 @@ uint8_t power_calculation(struct power_measure *measure)
     {
         status = power_analyze(measure, &kp_panel);
         if (RET_OK != status)
+        {
+            panel_checking = FALSE_STATE;
             return RET_ERR;
+        }
 
         kp_panel_storage.power = kp_panel.kp_power;
         kp_panel_storage.type = PANEL_TYPE;
         push_data_to_queue(&kp_panel_storage);
+        panel_checking = TRUE_STATE;
     }
     else if (CONSUME_TYPE == measure->type)
     {
         status = power_analyze(measure, &kp_consume);
         if (RET_OK != status)
+        {
+            consume_checking = FALSE_STATE;
             return RET_ERR;
+        }
 
         kp_consume_storage.power = kp_consume.kp_power;
         kp_consume_storage.type = CONSUME_TYPE;
         push_data_to_queue(&kp_consume_storage);
+        consume_checking = TRUE_STATE;
     }
     else
     {
@@ -229,22 +236,6 @@ void power_consume_measure_main_loop()
     }
 }
 
-void init_gpio_power_panel()
-{
-    led_power_panel.gpio = GPIO_LED_PANEL;
-    led_power_panel.speed = (MODE_NORMAL_DELAY*2);
-    led_power_panel.gpio_mode = GPIO_MODE_OUTPUT;
-    led_power_panel.state = led_status.led_power_panel;
-}
-
-void init_gpio_power_consume()
-{
-    led_power_consume.gpio = GPIO_LED_CONSUME;
-    led_power_consume.speed = (MODE_NORMAL_DELAY*2);
-    led_power_consume.gpio_mode = GPIO_MODE_OUTPUT;
-    led_power_consume.state = led_status.led_power_consume;
-}
-
 BaseType_t power_measure_init_task()
 {
     BaseType_t xReturn;
@@ -257,15 +248,6 @@ BaseType_t power_measure_init_task()
         // vTaskDelete(xTaskLedSTate);
         // Because of successful task, we need to create task blink led status
     }
-
-    init_gpio_power_panel();
-    xReturn = xTaskCreate(led_state_main_loop, "", 2 * BUF_SIZE_TASK, &led_power_panel, 1, &xTaskLedPanel);
-    if(xReturn == pdPASS)
-    {
-        /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "turn on led to tracking power from panel ");
-    }
-
     return xReturn;
 }
 
@@ -281,25 +263,11 @@ BaseType_t power_consume_init_task()
         /* The task was created.  Use the task's handle to delete the task. */
         ESP_LOGI(TAG, "The task of power consume measure init ");
     }
-
-    init_gpio_power_consume();
-    xReturn = xTaskCreate(led_state_main_loop, "", 2 * BUF_SIZE_TASK, &led_power_consume, 1, &xTaskLedConsume);
-    if(xReturn == pdPASS)
-    {
-        /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "turn on led to tracking power consume ");
-    }
     return xReturn;
 }
 
 void power_deinit_task()
 {
-    if (xTaskLedConsume != NULL)
-        vTaskDelete(xTaskLedConsume);
-
-    if (xTaskLedPanel != NULL)
-        vTaskDelete(xTaskLedPanel);
-
     if (xTaskPanelMea != NULL)
         vTaskDelete(xTaskPanelMea);
 

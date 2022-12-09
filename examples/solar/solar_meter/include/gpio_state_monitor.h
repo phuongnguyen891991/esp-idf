@@ -17,10 +17,13 @@ extern "C" {
 typedef struct led_checking {
     uint8_t led_setting:1;
     uint8_t led_delay:1;
-    uint8_t led_power_panel:1;
-    uint8_t led_power_consume:1;
+    uint8_t panel_led_tracking:1;
+    uint8_t consume_led_tracking:1;
     uint8_t led_connect:1;
     uint8_t led_running:1;
+    uint8_t wifi_checking:1;
+    uint8_t kitchen_checking:1;
+    uint8_t exhaust_checking:1;
 };
 
 extern struct led_checking led_status;

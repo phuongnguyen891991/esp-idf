@@ -16,6 +16,7 @@ extern "C" {
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "driver/gpio.h"
 
 
 #define RET_ERR 1
@@ -27,7 +28,7 @@ extern "C" {
 // define GPIO number for using in this project
 #define GPIO_LED_PANEL      GPIO_NUM_17
 #define GPIO_LED_CONSUME    GPIO_NUM_18
-#define GPIO_LED_WIFI       GPIO_NUM_19
+#define GPIO_LED_WIFI       GPIO_NUM_5
 
 #define KITCHEN_LIGHT   GPIO_NUM_25
 #define EXHAUSTED_FAN   GPIO_NUM_26
@@ -103,6 +104,12 @@ typedef struct power_in_cache {
 
 extern struct gpio_config kitchen_light;
 extern struct gpio_config exhausted_fan;
+extern struct gpio_config led_power_panel;
+extern struct gpio_config led_power_consume;
+
+extern bool wifi_connection;
+extern bool panel_checking;
+extern bool consume_checking;
 
 #ifdef __cplusplus
 }
