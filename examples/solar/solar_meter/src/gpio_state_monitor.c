@@ -58,7 +58,7 @@ void initialize_gpio(struct gpio_config *led)
 void init_wifi_led_tracking()
 {
     wifi_led_tracking.gpio = GPIO_LED_WIFI;
-    wifi_led_tracking.speed = 0;
+    wifi_led_tracking.speed = (MODE_NORMAL_DELAY*2);
     wifi_led_tracking.gpio_mode = GPIO_MODE_OUTPUT;
     wifi_led_tracking.state = led_status.wifi_checking;
     // initialize_gpio(&wifi_led_tracking);
@@ -85,7 +85,7 @@ void init_power_consume_led()
 void init_kitchen_light()
 {
     kitchen_light.gpio = KITCHEN_LIGHT;
-    kitchen_light.speed = 0;
+    kitchen_light.speed = (MODE_NORMAL_DELAY*2);
     kitchen_light.gpio_mode = GPIO_MODE_OUTPUT;
     kitchen_light.state = led_status.kitchen_checking;
     // initialize_gpio(&kitchen_light);
@@ -94,7 +94,7 @@ void init_kitchen_light()
 void init_exhausted_fan()
 {
     exhausted_fan.gpio = EXHAUSTED_FAN;
-    exhausted_fan.speed = 0;
+    exhausted_fan.speed = (MODE_NORMAL_DELAY*2);
     exhausted_fan.gpio_mode = GPIO_MODE_OUTPUT;
     exhausted_fan.state = led_status.exhaust_checking;
     // initialize_gpio(&exhausted_fan);
@@ -173,7 +173,7 @@ void led_state_main_loop(void *para)
     return;
 }
 
-void led_tracking(struct gpio_config *led, bool led_type)
+void led_tracking(struct gpio_config *led, bool *led_type)
 {
     if (led == NULL)
         return;
@@ -181,7 +181,7 @@ void led_tracking(struct gpio_config *led, bool led_type)
     initialize_gpio(led);
     while (1)
     {
-        if (FALSE_STATE == led_type)
+        if (FALSE_STATE == *led_type)
         {
             solid_led(led);
             delay_msecond(MODE_NORMAL_DELAY);
@@ -199,7 +199,7 @@ void led_state_wifi_tracking(void *para)
     if (para == NULL)
         return;
 
-    led_tracking(led, wifi_connection);
+    led_tracking(led, &wifi_connection);
     return;
 }
 
@@ -210,7 +210,7 @@ void led_state_panel_tracking(void *para)
     if (para == NULL)
         return;
 
-    led_tracking(led, panel_checking);
+    led_tracking(led, &panel_checking);
     return;
 }
 
@@ -221,7 +221,7 @@ void led_state_consume_tracking(void *para)
     if (para == NULL)
         return;
 
-    led_tracking(led, consume_checking);
+    led_tracking(led, &consume_checking);
     return;
 }
 
