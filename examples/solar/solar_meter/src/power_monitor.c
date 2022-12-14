@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "power_monitor.h"
 #include "generic_define.h"
 #include "gpio_state_monitor.h"
@@ -26,6 +27,9 @@ QueueHandle_t power_consume_queue;
 TaskHandle_t xTaskPanelMea;
 TaskHandle_t xTaskConsumeMea;
 
+SemaphoreHandle_t xSemaphore_pn = NULL;
+SemaphoreHandle_t xSemaphore_cs = NULL;
+
 struct power_storage kp_panel_storage;
 struct power_storage kp_consume_storage;
 
@@ -42,10 +46,9 @@ uint32_t getMillis(void)
     return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-uint8_t queue_power_init()
+uint8_t queue_power_panel_init()
 {
     memset(&kp_panel_storage, 0, sizeof(struct power_storage));
-    memset(&kp_consume_storage, 0, sizeof(struct power_storage));
 
     power_panel_queue = xQueueCreate(MAX_QUEUE_SIZE, sizeof(struct power_storage));
     if (power_panel_queue == 0)
@@ -53,11 +56,26 @@ uint8_t queue_power_init()
         ESP_LOGI(TAG, "Failed to create queue for data panel!");
     }
 
+    xSemaphore_pn = xSemaphoreCreateBinary();
+    if (NULL == xSemaphore_pn)
+        return RET_ERR;
+
+    return RET_OK;
+}
+
+uint8_t queue_power_consume_init()
+{
+    memset(&kp_consume_storage, 0, sizeof(struct power_storage));
+
     power_consume_queue = xQueueCreate(MAX_QUEUE_SIZE, sizeof(struct power_storage));
     if (power_consume_queue == 0)
     {
         ESP_LOGI(TAG, "Failed to create queue for data consume!");
     }
+
+    xSemaphore_cs = xSemaphoreCreateBinary();
+    if (NULL == xSemaphore_cs)
+        return RET_ERR;
 
     return RET_OK;
 }
@@ -76,22 +94,36 @@ uint8_t push_data_to_queue(struct power_storage *power)
         available_space = (size_t)uxQueueSpacesAvailable(power_panel_queue);
         ESP_LOGI(TAG, "The current space in queue: %d ", available_space);
 
-        xStatus = xQueueSendToBack(power_panel_queue, (void*)power, (TickType_t)0);
-        if (xStatus == pdPASS)
-            ESP_LOGI(TAG, "success to send panel data to queue!");
-        else
-            ESP_LOGI(TAG, "Failed to send panel data to queue!");
+        if(NULL != xSemaphore_pn)
+        {
+            if(xSemaphoreTake(xSemaphore_pn, MODE_QUICK_DELAY) == pdPASS)
+            {
+                xStatus = xQueueSendToBack(power_panel_queue, (void*)power, (TickType_t)0);
+                if (xStatus == pdPASS)
+                    ESP_LOGI(TAG, "success to send panel data to queue!");
+                else
+                    ESP_LOGI(TAG, "Failed to send panel data to queue!");
+            }
+            xSemaphoreGive(xSemaphore_pn);
+        }
     }
     else if(CONSUME_TYPE == power->type)
     {
         available_space = (size_t)uxQueueSpacesAvailable(power_consume_queue);
         ESP_LOGI(TAG, "The current space in queue: %d ", available_space);
 
-        xStatus = xQueueSendToBack(power_consume_queue, (void*)power, (TickType_t)0);
-        if (xStatus == pdPASS)
-            ESP_LOGI(TAG, "Success to send consume data to queue!");
-        else
-            ESP_LOGI(TAG, "Failed to send consume data to queue!");
+        if (NULL != xSemaphore_cs)
+        {
+            if (xSemaphoreTake(xSemaphore_cs, MODE_QUICK_DELAY) == pdPASS)
+            {
+                xStatus = xQueueSendToBack(power_consume_queue, (void*)power, (TickType_t)0);
+                if (xStatus == pdPASS)
+                    ESP_LOGI(TAG, "Success to send consume data to queue!");
+                else
+                    ESP_LOGI(TAG, "Failed to send consume data to queue!");
+            }
+            xSemaphoreGive(xSemaphore_cs);
+        }
     }
     else
         return RET_ERR;
@@ -240,6 +272,8 @@ BaseType_t power_measure_init_task()
 {
     BaseType_t xReturn;
 
+    queue_power_panel_init();
+
     xReturn = xTaskCreate(power_panel_measure_main_loop, "task measure power from panel", 2 * BUF_SIZE_TASK, NULL, 1, &xTaskPanelMea);
     if(xReturn == pdPASS)
     {
@@ -255,7 +289,7 @@ BaseType_t power_consume_init_task()
 {
     BaseType_t xReturn;
 
-    queue_power_init();
+    queue_power_consume_init();
 
     xReturn = xTaskCreate(power_consume_measure_main_loop, "measure power from comsume", 2 * BUF_SIZE_TASK, NULL, 1, &xTaskConsumeMea);
     if(xReturn == pdPASS)
@@ -273,6 +307,12 @@ void power_deinit_task()
 
     if (xTaskConsumeMea != NULL)
         vTaskDelete(xTaskConsumeMea);
+
+    if (xSemaphore_pn != NULL)
+        vSemaphoreDelete(xSemaphore_pn);
+
+    if (xSemaphore_cs != NULL)
+        vSemaphoreDelete(xSemaphore_cs);
 }
 
 BaseType_t power_panel_measure_main_task()
