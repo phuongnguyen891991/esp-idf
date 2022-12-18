@@ -49,8 +49,9 @@
 
 // LCD2004
 #define LCD_NUM_ROWS               4
-#define LCD_NUM_COLUMNS            40
+#define LCD_NUM_COLUMNS            20
 #define LCD_NUM_VISIBLE_COLUMNS    20
+#define CONFIG_LCD2004_I2C_ADDRESS  0x3F
 
 // Undefine USE_STDIN if no stdin is available (e.g. no USB UART) - a fixed delay will occur instead of a wait for a keypress.
 #define USE_STDIN  1
