@@ -1,13 +1,17 @@
+set(COMPONENT_SRCDIRS ".")
+# set(COMPONENT_ADD_INCLUDEDIRS ".")
+
+# register_component(REQUIRES esp32-smbus)
+
 list(APPEND srcs
         "solar_meter.c"
         "../src/delay_monitor.c"
         "../src/gpio_state_monitor.c"
         "../src/power_monitor.c"
         "../src/lcd_display.c"
-        "../src/lcd2004_i2c.c"
         "../src/wifi_config.c")
 
-idf_component_register(SRCS ${srcs}
-                       INCLUDE_DIRS "."
+idf_component_register( SRCS ${srcs}
+                        INCLUDE_DIRS "."
                                     "../src"
                                     "../include")

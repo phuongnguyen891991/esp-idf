@@ -61,7 +61,6 @@ void init_wifi_led_tracking()
     wifi_led_tracking.speed = (MODE_NORMAL_DELAY*2);
     wifi_led_tracking.gpio_mode = GPIO_MODE_OUTPUT;
     wifi_led_tracking.state = led_status.wifi_checking;
-    // initialize_gpio(&wifi_led_tracking);
 }
 
 void init_power_panel_led()
@@ -70,7 +69,6 @@ void init_power_panel_led()
     panel_led_tracking.speed = (MODE_NORMAL_DELAY*2);
     panel_led_tracking.gpio_mode = GPIO_MODE_OUTPUT;
     panel_led_tracking.state = led_status.panel_led_tracking;
-    // initialize_gpio(&panel_led_tracking);
 }
 
 void init_power_consume_led()
@@ -79,7 +77,6 @@ void init_power_consume_led()
     consume_led_tracking.speed = (MODE_NORMAL_DELAY*2);
     consume_led_tracking.gpio_mode = GPIO_MODE_OUTPUT;
     consume_led_tracking.state = led_status.consume_led_tracking;
-    // initialize_gpio(&consume_led_tracking);
 }
 
 void init_kitchen_light()
@@ -88,7 +85,6 @@ void init_kitchen_light()
     kitchen_light.speed = (MODE_NORMAL_DELAY*2);
     kitchen_light.gpio_mode = GPIO_MODE_OUTPUT;
     kitchen_light.state = led_status.kitchen_checking;
-    // initialize_gpio(&kitchen_light);
 }
 
 void init_exhausted_fan()
@@ -97,7 +93,6 @@ void init_exhausted_fan()
     exhausted_fan.speed = (MODE_NORMAL_DELAY*2);
     exhausted_fan.gpio_mode = GPIO_MODE_OUTPUT;
     exhausted_fan.state = led_status.exhaust_checking;
-    // initialize_gpio(&exhausted_fan);
 }
 
 void led_working_status()
@@ -153,8 +148,7 @@ void solid_led(struct gpio_config *led)
 {
     if (led == NULL)
         return;
-    ESP_LOGI(TAG, "GPIO LED (%d) solid %d", led->gpio, led->state);
-    // blink_led(led);
+
     gpio_set_level(led->gpio, led->state);
     return;
 }
@@ -247,32 +241,20 @@ BaseType_t led_state_main_task()
     config_gpio_led_working_state();
 
     xReturn = xTaskCreate(led_state_main_loop, "Task blink LED", 2 * BUF_SIZE_TASK, &led_working, 1, &xTaskLedSTate);
-    if(xReturn == pdPASS)
-    {
-        /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "The task of led state was created ");
-    }
+    if(xReturn != pdPASS)
+        ESP_LOGI(TAG, "The task of led state was created failed ");
 
     xReturn = xTaskCreate(led_state_wifi_tracking, "Wi-Fi tracking led", 2 * BUF_SIZE_TASK, &wifi_led_tracking, 1, &xTaskWifiSTate);
-    if(xReturn == pdPASS)
-    {
-        /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "The task of Wi-Fi tracking was created ");
-    }
+    if(xReturn != pdPASS)
+        ESP_LOGI(TAG, "The task of Wi-Fi tracking was created failed");
 
     xReturn = xTaskCreate(led_state_panel_tracking, "Panel tracking led", 2 * BUF_SIZE_TASK, &panel_led_tracking, 1, &xTaskLedPanel);
-    if(xReturn == pdPASS)
-    {
-        /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "The task of Panel led tracking was created ");
-    }
+    if(xReturn != pdPASS)
+        ESP_LOGI(TAG, "The task of Panel led tracking was created failed");
 
     xReturn = xTaskCreate(led_state_consume_tracking, "Consume tracking led", 2 * BUF_SIZE_TASK, &consume_led_tracking, 1, &xTaskLedConsume);
-    if(xReturn == pdPASS)
-    {
-        /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "The task of Consume led tracking was created ");
-    }
+    if(xReturn != pdPASS)
+        ESP_LOGI(TAG, "The task of Consume led tracking was created failed");
 
     return xReturn;
 }

@@ -11,7 +11,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-#include "led_strip.h"
+// #include "led_strip.h"
 #include "sdkconfig.h"
 #include "gpio_state_monitor.h"
 #include "power_monitor.h"
@@ -20,7 +20,6 @@
 
 void app_main(void)
 {
-    //start task to blink led state
     led_state_main_task();
     power_consume_measure_main_task();
     power_panel_measure_main_task();

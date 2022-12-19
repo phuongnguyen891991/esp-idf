@@ -52,9 +52,7 @@ uint8_t queue_power_panel_init()
 
     power_panel_queue = xQueueCreate(MAX_QUEUE_SIZE, sizeof(struct power_storage));
     if (power_panel_queue == 0)
-    {
         ESP_LOGI(TAG, "Failed to create queue for data panel!");
-    }
 
     xSemaphore_pn = xSemaphoreCreateBinary();
     if (NULL == xSemaphore_pn)
@@ -69,9 +67,7 @@ uint8_t queue_power_consume_init()
 
     power_consume_queue = xQueueCreate(MAX_QUEUE_SIZE, sizeof(struct power_storage));
     if (power_consume_queue == 0)
-    {
         ESP_LOGI(TAG, "Failed to create queue for data consume!");
-    }
 
     xSemaphore_cs = xSemaphoreCreateBinary();
     if (NULL == xSemaphore_cs)
@@ -87,21 +83,14 @@ uint8_t push_data_to_queue(struct power_storage *power)
     if (power == NULL)
         return RET_ERR;
 
-    size_t available_space;
-
     if (PANEL_TYPE == power->type)
     {
-        available_space = (size_t)uxQueueSpacesAvailable(power_panel_queue);
-        ESP_LOGI(TAG, "The current space in queue: %d ", available_space);
-
         if(NULL != xSemaphore_pn)
         {
             if(xSemaphoreTake(xSemaphore_pn, MODE_QUICK_DELAY) == pdPASS)
             {
                 xStatus = xQueueSendToBack(power_panel_queue, (void*)power, (TickType_t)0);
-                if (xStatus == pdPASS)
-                    ESP_LOGI(TAG, "success to send panel data to queue!");
-                else
+                if (xStatus != pdPASS)
                     ESP_LOGI(TAG, "Failed to send panel data to queue!");
             }
             xSemaphoreGive(xSemaphore_pn);
@@ -109,17 +98,12 @@ uint8_t push_data_to_queue(struct power_storage *power)
     }
     else if(CONSUME_TYPE == power->type)
     {
-        available_space = (size_t)uxQueueSpacesAvailable(power_consume_queue);
-        ESP_LOGI(TAG, "The current space in queue: %d ", available_space);
-
         if (NULL != xSemaphore_cs)
         {
             if (xSemaphoreTake(xSemaphore_cs, MODE_QUICK_DELAY) == pdPASS)
             {
                 xStatus = xQueueSendToBack(power_consume_queue, (void*)power, (TickType_t)0);
-                if (xStatus == pdPASS)
-                    ESP_LOGI(TAG, "Success to send consume data to queue!");
-                else
+                if (xStatus != pdPASS)
                     ESP_LOGI(TAG, "Failed to send consume data to queue!");
             }
             xSemaphoreGive(xSemaphore_cs);
@@ -191,6 +175,8 @@ uint8_t power_calculation(struct power_measure *measure)
         }
 
         kp_panel_storage.power = kp_panel.kp_power;
+        kp_panel_storage.vol = measure->vol;
+        kp_panel_storage.current = measure->current;
         kp_panel_storage.type = PANEL_TYPE;
         push_data_to_queue(&kp_panel_storage);
         panel_checking = TRUE_STATE;
@@ -205,6 +191,8 @@ uint8_t power_calculation(struct power_measure *measure)
         }
 
         kp_consume_storage.power = kp_consume.kp_power;
+        kp_consume_storage.vol = measure->vol;
+        kp_consume_storage.current = measure->current;
         kp_consume_storage.type = CONSUME_TYPE;
         push_data_to_queue(&kp_consume_storage);
         consume_checking = TRUE_STATE;
@@ -214,7 +202,7 @@ uint8_t power_calculation(struct power_measure *measure)
         ESP_LOGI(TAG, "Not known type to push data to queue");
         return RET_ERR;
     }
-    // store the value into queue
+
     return RET_OK;
 }
 
@@ -222,7 +210,6 @@ void power_panel_measure_main_loop()
 {
     while(1)
     {
-        ESP_LOGI(TAG, "Power panel measurement !");
         struct power_measure measure;
         uint8_t status = 0;
 
@@ -247,7 +234,6 @@ void power_consume_measure_main_loop()
 {
     while(1)
     {
-        ESP_LOGI(TAG, "Power consume measurement !");
         struct power_measure measure;
         uint8_t status = 0;
 
@@ -275,13 +261,9 @@ BaseType_t power_measure_init_task()
     queue_power_panel_init();
 
     xReturn = xTaskCreate(power_panel_measure_main_loop, "task measure power from panel", 2 * BUF_SIZE_TASK, NULL, 1, &xTaskPanelMea);
-    if(xReturn == pdPASS)
-    {
-        /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "The task of power panel measure init ");
-        // vTaskDelete(xTaskLedSTate);
-        // Because of successful task, we need to create task blink led status
-    }
+    if(xReturn != pdPASS)
+        ESP_LOGI(TAG, "The task of power panel measure init failed");
+
     return xReturn;
 }
 
@@ -292,11 +274,9 @@ BaseType_t power_consume_init_task()
     queue_power_consume_init();
 
     xReturn = xTaskCreate(power_consume_measure_main_loop, "measure power from comsume", 2 * BUF_SIZE_TASK, NULL, 1, &xTaskConsumeMea);
-    if(xReturn == pdPASS)
-    {
-        /* The task was created.  Use the task's handle to delete the task. */
-        ESP_LOGI(TAG, "The task of power consume measure init ");
-    }
+    if(xReturn != pdPASS)
+        ESP_LOGI(TAG, "The task of power consume measure init failed ");
+
     return xReturn;
 }
 
@@ -320,10 +300,9 @@ BaseType_t power_panel_measure_main_task()
     BaseType_t xReturn;
 
     xReturn = power_measure_init_task();
-    if(xReturn == pdPASS)
-    {
+    if(xReturn != pdPASS)
         ESP_LOGI(TAG, "The main task of power panel was created ");
-    }
+
     return xReturn;
 }
 
@@ -332,10 +311,8 @@ BaseType_t power_consume_measure_main_task()
     BaseType_t xReturn;
 
     xReturn = power_consume_init_task();
-    if(xReturn == pdPASS)
-    {
-        /* The task was created.  Use the task's handle to delete the task. */
+    if(xReturn != pdPASS)
         ESP_LOGI(TAG, "The main task of power consume was created ");
-    }
+
     return xReturn;
 }

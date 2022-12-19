@@ -44,8 +44,12 @@ extern "C" {
 #define CONSUME_TYPE 2
 #define INTERNAL_CHECK  100
 
+#define IPV4_STR_SIZE   16
+
 typedef struct power_storage {
     uint32_t power;
+    uint32_t vol;
+    uint32_t current;
     uint8_t type;
 };
 
@@ -110,6 +114,8 @@ extern struct gpio_config led_power_consume;
 extern bool wifi_connection;
 extern bool panel_checking;
 extern bool consume_checking;
+
+extern char g_ipv4_str[IPV4_STR_SIZE];
 
 #ifdef __cplusplus
 }

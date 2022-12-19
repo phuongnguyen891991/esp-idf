@@ -33,6 +33,7 @@ static const int ESPTOUCH_DONE_BIT = BIT1;
 static const char *TAG = "smartconfig_example";
 
 bool wifi_connection;
+char g_ipv4_str[IPV4_STR_SIZE];
 
 static void smartconfig_example_task(void * parm);
 
@@ -54,6 +55,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(s_wifi_event_group, CONNECTED_BIT);
         wifi_connection = TRUE_STATE;
+        sprintf(g_ipv4_str, IPSTR, IP2STR(&event->ip_info.ip));
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_LOST_IP)
     {
