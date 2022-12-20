@@ -222,16 +222,28 @@ void led_state_consume_tracking(void *para)
 void deinit_task_led_state()
 {
     if (xTaskLedSTate != NULL)
+    {
         vTaskDelete(xTaskLedSTate);
+        xTaskLedSTate = NULL;
+    }
 
     if (xTaskWifiSTate != NULL)
+    {
         vTaskDelete(xTaskWifiSTate);
+        xTaskWifiSTate = NULL;
+    }
 
     if (xTaskLedConsume != NULL)
+    {
         vTaskDelete(xTaskLedConsume);
+        xTaskLedConsume = NULL;
+    }
 
     if (xTaskLedPanel != NULL)
+    {
         vTaskDelete(xTaskLedPanel);
+        xTaskLedPanel = NULL;
+    }
 }
 
 BaseType_t led_state_main_task()

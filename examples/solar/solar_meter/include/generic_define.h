@@ -44,7 +44,7 @@ extern "C" {
 #define CONSUME_TYPE 2
 #define INTERNAL_CHECK  100
 
-#define IPV4_STR_SIZE   16
+#define IPV4_STR_SIZE   18
 
 typedef struct power_storage {
     uint32_t power;

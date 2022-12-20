@@ -14,6 +14,7 @@
 #include "delay_monitor.h"
 #include "smbus.h"
 #include "i2c-lcd1602.h"
+#include "lcd_display.h"
 
 static const char *TAG = "LCD Display";
 
@@ -39,6 +40,8 @@ static const char *TAG = "LCD Display";
 
 TaskHandle_t xTaskLcdDisplayPanel;
 TaskHandle_t xTaskLcdDisplayConsume;
+
+SemaphoreHandle_t lcdDisplaySema = NULL;
 
 #define STICK_TO_WAIT  portMAX_DELAY
 
@@ -135,74 +138,84 @@ uint8_t lcd_display_init()
 {
     BaseType_t xReturn;
 
-    xReturn = xTaskCreate(get_power_panel_from_queue, "get power panel from queue", 2 * BUF_SIZE_TASK, NULL, 1, &xTaskLcdDisplayPanel);
+    xReturn = xTaskCreate(get_power_panel_from_queue, "get power panel from queue", BUF_SIZE_TASK, NULL, 1, &xTaskLcdDisplayPanel);
     if(xReturn != pdPASS)
         ESP_LOGI(TAG, "The task of LCD display power panel was created ");
 
-    xReturn = xTaskCreate(get_power_consume_from_queue, "get power consume from queue", 2 * BUF_SIZE_TASK, NULL, 1, &xTaskLcdDisplayConsume);
+    xReturn = xTaskCreate(get_power_consume_from_queue, "get power consume from queue", BUF_SIZE_TASK, NULL, 1, &xTaskLcdDisplayConsume);
     if(xReturn != pdPASS)
         ESP_LOGI(TAG, "The task of LCD display power consume was created ");
 
     return xReturn;
 }
 
-void located_lcd_string(i2c_lcd1602_info_t *lcd_info)
+void lcd_show_power(void *vPara)
 {
-    uint8_t heart[8] = {0x0, 0xa, 0x1f, 0x1f, 0xe, 0x4, 0x0};
     char lcd_string[LCD_MAX_STRING];
 
+    i2c_lcd1602_info_t *lcd_info = (i2c_lcd1602_info_t *)vPara;
     if (NULL == lcd_info)
         return;
 
-    i2c_lcd1602_define_char(lcd_info, I2C_LCD1602_INDEX_CUSTOM_0, heart);
-
     i2c_lcd1602_move_cursor(lcd_info, 0, 0);
     memset(lcd_string, 0, sizeof(lcd_string));
-    sprintf(lcd_string, "Vp:%2ld  Vc:%2ld", lcd_dp.pPanel.vol, lcd_dp.pConsume.vol);
+    sprintf(lcd_string, "Vp:%2ld |Vc:%2ld |", lcd_dp.pPanel.vol, lcd_dp.pConsume.vol);
     i2c_lcd1602_write_string(lcd_info, lcd_string);
 
     i2c_lcd1602_move_cursor(lcd_info, 0, 1);
     memset(lcd_string, 0, sizeof(lcd_string));
-    sprintf(lcd_string, "Ip:%2ld  Ic:%2ld",lcd_dp.pPanel.current, lcd_dp.pConsume.current);
+    sprintf(lcd_string, "Ip:%2ld |Ic:%2ld |", lcd_dp.pPanel.current, lcd_dp.pConsume.current);
     i2c_lcd1602_write_string(lcd_info, lcd_string);
 
     i2c_lcd1602_move_cursor(lcd_info, 0, 2);
     memset(lcd_string, 0, sizeof(lcd_string));
-    sprintf(lcd_string, "Pp:%3ld  Pc:%3ld", lcd_dp.pPanel.power, lcd_dp.pConsume.power);
+    sprintf(lcd_string, "Pp:%3ld|Pc:%3ld|", lcd_dp.pPanel.power, lcd_dp.pConsume.power);
     i2c_lcd1602_write_string(lcd_info, lcd_string);
 
+    i2c_lcd1602_move_cursor(lcd_info, 0, 3);
+    memset(lcd_string, 0, sizeof(lcd_string));
+    strncpy(lcd_dp.ipv4, g_ipv4_str, IPV4_STR_SIZE-1);
+    sprintf(lcd_string, "ip%s", lcd_dp.ipv4);
+    i2c_lcd1602_write_string(lcd_info, lcd_string);
+}
+
+void lcd_blink_heart_state(void *vPara)
+{
+    uint8_t heart[8] = {0x0, 0xa, 0x1f, 0x1f, 0xe, 0x4, 0x0};
+
+    i2c_lcd1602_info_t *lcd_info = (i2c_lcd1602_info_t *)vPara;
+    if (NULL == lcd_info)
+        return;
+
+    i2c_lcd1602_define_char(lcd_info, I2C_LCD1602_INDEX_CUSTOM_0, heart);
     if (blink_heart == true)
     {
         i2c_lcd1602_move_cursor(lcd_info, 19, 0);
         i2c_lcd1602_write_char(lcd_info, I2C_LCD1602_CHARACTER_CUSTOM_0);
         i2c_lcd1602_move_cursor(lcd_info, 19, 1);
-        i2c_lcd1602_write_char(lcd_info, I2C_LCD1602_CHARACTER_CUSTOM_0);
+        i2c_lcd1602_write_char(lcd_info, ' ');
     }
     else
     {
         i2c_lcd1602_move_cursor(lcd_info, 19, 0);
         i2c_lcd1602_write_char(lcd_info, ' ');
         i2c_lcd1602_move_cursor(lcd_info, 19, 1);
-        i2c_lcd1602_write_char(lcd_info, ' ');
+        i2c_lcd1602_write_char(lcd_info, I2C_LCD1602_CHARACTER_CUSTOM_0);
     }
-
-    i2c_lcd1602_move_cursor(lcd_info, 0, 3);
-    memset(lcd_string, 0, sizeof(lcd_string));
-    strncpy(lcd_dp.ipv4, g_ipv4_str, IPV4_STR_SIZE);
-    sprintf(lcd_string, "ip:%s", lcd_dp.ipv4);
-    i2c_lcd1602_write_string(lcd_info, lcd_string);
-
     blink_heart = !blink_heart;
-    delay_msecond(MODE_NORMAL_DELAY);
 }
 
 void lcd_2004_task(void *pvParameter)
 {
-    // Set up I2C
-    i2c_master_init();
     i2c_port_t i2c_num = I2C_MASTER_NUM;
     uint8_t address = CONFIG_LCD1602_I2C_ADDRESS;
 
+    lcdDisplaySema = xSemaphoreCreateBinary();
+    if (NULL == lcdDisplaySema)
+        return;
+
+    // Set up I2C
+    i2c_master_init();
     // Set up the SMBus
     smbus_info_t * smbus_info = smbus_malloc();
     ESP_ERROR_CHECK(smbus_init(smbus_info, i2c_num, address));
@@ -222,15 +235,26 @@ void lcd_2004_task(void *pvParameter)
 
     while (true)
     {
-        located_lcd_string(lcd_info);
+        if (NULL != lcdDisplaySema)
+        {
+            if (pdPASS == xSemaphoreTake(lcdDisplaySema, MODE_QUICK_DELAY))
+            {
+                lcd_show_power(lcd_info);
+                lcd_blink_heart_state(lcd_info);
+            }
+            xSemaphoreGive(lcdDisplaySema);
+        }
+        delay_msecond(MODE_NORMAL_DELAY);
     }
+
+    return;
 }
 
 BaseType_t lcd_display_main_task()
 {
     BaseType_t xReturn;
 
-    xReturn = xTaskCreate(&lcd_2004_task, "lcd2004_task", 2 * 1024, NULL, 5, NULL);
+    xReturn = xTaskCreate(&lcd_2004_task, "lcd2004_task", 2 * BUF_SIZE_TASK, NULL, 5, NULL);
     if(xReturn != pdPASS)
         ESP_LOGI(TAG, "The task of LCD display power panel was created failed");
 

@@ -283,16 +283,27 @@ BaseType_t power_consume_init_task()
 void power_deinit_task()
 {
     if (xTaskPanelMea != NULL)
+    {
         vTaskDelete(xTaskPanelMea);
+        xTaskPanelMea = NULL;
+    }
 
     if (xTaskConsumeMea != NULL)
+    {
         vTaskDelete(xTaskConsumeMea);
+        xTaskConsumeMea = NULL;
+    }
 
     if (xSemaphore_pn != NULL)
+    {
         vSemaphoreDelete(xSemaphore_pn);
-
+        xSemaphore_pn = NULL;
+    }
     if (xSemaphore_cs != NULL)
+    {
         vSemaphoreDelete(xSemaphore_cs);
+        xSemaphore_cs = NULL;
+    }
 }
 
 BaseType_t power_panel_measure_main_task()
